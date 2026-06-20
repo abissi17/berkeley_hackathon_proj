@@ -9,6 +9,7 @@ Run:
     flask run --port 5000
 """
 
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -216,6 +217,6 @@ def health():
 # Main
 # ===================================================================
 if __name__ == "__main__":
-    port = int("5000")
+    port = int(os.getenv("FLASK_PORT", "5001"))
     print(f"\n  Compass backend running at http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=True)
