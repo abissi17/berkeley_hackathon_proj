@@ -217,5 +217,5 @@ def health():
 # ===================================================================
 if __name__ == "__main__":
     port = int("5000")
-    print(f"\n  🧭 Compass backend running at http://localhost:{port}\n")
+    print(f"\n  Compass backend running at http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=True)
