@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getClinicChildren, getClinicChild } from "../api/compassApi";
 import ChildRow from "../components/ChildRow";
 import RoadmapTab from "../components/RoadmapTab";
@@ -8,6 +8,7 @@ import ProvidersTab from "../components/ProvidersTab";
 import ChatTab from "../components/ChatTab";
 
 export default function ClinicPage() {
+  const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -57,7 +58,10 @@ export default function ClinicPage() {
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => navigate("/")}
+          >
             <span className="text-2xl">🧭</span>
             <h1 className="text-xl font-bold text-gray-900">
               Compass Clinic
@@ -67,9 +71,13 @@ export default function ClinicPage() {
             <Link to="/intake" className="btn-primary text-sm !py-2 !px-4">
               + Add new child
             </Link>
-            <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">
-              Home
-            </Link>
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
+            >
+              <span className="text-lg leading-none">←</span>
+              Back
+            </button>
           </div>
         </div>
       </header>
