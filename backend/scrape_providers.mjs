@@ -1,4 +1,4 @@
-                                    /**
+/**
  * Scrape autism/developmental health providers near a zip code using
  * Browserbase + Playwright DOM selectors (no LLM API key needed).
  *
