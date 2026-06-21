@@ -19,7 +19,7 @@ Your task: given the child's intake information, generate TWO things in a single
 - Age: {child_age_months} months
 - Zip code: {zip_code}
 - Parent's concerns: "{concerns}"
-- Diagnosis status: {diagnosis_status}
+- Diagnosis status: {diagnosis_status} 
 - Insurance: {insurance}
 
 ## Roadmap Requirements
