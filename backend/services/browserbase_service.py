@@ -1,23 +1,26 @@
 """
-Browserbase integration for scraping local therapy providers by zip code.
+Browserbase + Stagehand integration for scraping local autism/developmental
+health providers by zip code.
 
-Currently returns MOCK data.  When the Browserbase API key is configured
-in .env, the real scraping logic will search Psychology Today, ASHA,
-Autism Speaks, and California regional center directories.
+The heavy lifting runs in backend/scrape_providers.mjs (Node.js + Stagehand).
+This module calls that script via subprocess and returns parsed JSON.
 
-The FALLBACK_PROVIDERS list is always available so the Providers tab is
-never blank during a demo.
+Falls back to FALLBACK_PROVIDERS if scraping fails or keys are not set.
 """
 
+import json
 import os
+import subprocess
+from pathlib import Path
 
 BROWSERBASE_API_KEY = os.getenv("BROWSERBASE_API_KEY", "")
 BROWSERBASE_PROJECT_ID = os.getenv("BROWSERBASE_PROJECT_ID", "")
 
-# ---------------------------------------------------------------------------
-# Fallback list — returned when scraping fails or no API key is configured.
-# Always keep this populated.
-# ---------------------------------------------------------------------------
+# Absolute path to the Node scraper script
+_SCRIPT = Path(__file__).parent.parent / "scrape_providers.mjs"
+
+# Root of the project (where node_modules lives)
+_NODE_ROOT = Path(__file__).parent.parent.parent
 
 FALLBACK_PROVIDERS = [
     {
@@ -53,25 +56,26 @@ FALLBACK_PROVIDERS = [
 
 def scrape_providers(zip_code: str) -> list[dict]:
     """
-    Scrape local provider directories for the given zip code.
+    Return local autism/developmental health providers for the given zip code.
 
-    When Browserbase is configured, performs a live scrape.  Otherwise
-    returns mock results with local-looking clinic names generated from
-    the zip code.
-
-    Returns a list of provider dicts with: name, type, address, phone, website.
+    If Browserbase keys are present, runs the Stagehand scraper and returns
+    live results.  Otherwise returns plausible mock data.
     """
     if BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID:
-        return _call_browserbase(zip_code)
+        try:
+            return _call_browserbase(zip_code)
+        except Exception as exc:
+            print(f"[browserbase] Scraping failed ({exc}) — using fallback")
+            return FALLBACK_PROVIDERS
 
-    # --- mock path: generate plausible clinic names from zip code ---
+    # Mock path — plausible local clinic names keyed to zip code
     return [
         {
-            "name": f"Bay Area Children's Therapy — {zip_code}",
-            "type": "Speech & occupational therapy",
+            "name": f"Bay Area Autism & Behavioral Health — {zip_code}",
+            "type": "Autism therapy & ABA",
             "address": f"123 Main St, Suite 200, {zip_code}",
             "phone": "(510) 555-0100",
-            "website": "https://www.bayareachildrenstherapy.com",
+            "website": "https://www.bayareaautismcenter.com",
         },
         {
             "name": "Developmental Pathways Clinic",
@@ -99,5 +103,34 @@ def scrape_providers(zip_code: str) -> list[dict]:
 
 
 def _call_browserbase(zip_code: str) -> list[dict]:
-    """Real Browserbase scraping.  Stub — returns mock data for now."""
-    return scrape_providers(zip_code)
+    """
+    Run scrape_providers.mjs via Node.js and return parsed provider list.
+    Raises on subprocess error; caller falls back to FALLBACK_PROVIDERS.
+    """
+    env = {
+        **os.environ,
+        "BROWSERBASE_API_KEY": BROWSERBASE_API_KEY,
+        "BROWSERBASE_PROJECT_ID": BROWSERBASE_PROJECT_ID,
+    }
+
+    result = subprocess.run(
+        ["node", str(_SCRIPT), zip_code],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        cwd=str(_NODE_ROOT),
+        env=env,
+    )
+
+    if result.stderr:
+        print(f"[browserbase] {result.stderr.strip()}")
+
+    stdout = result.stdout.strip()
+    if not stdout:
+        raise RuntimeError("scraper returned empty output")
+
+    providers = json.loads(stdout)
+    if not isinstance(providers, list) or len(providers) == 0:
+        raise RuntimeError("scraper returned no providers")
+
+    return providers

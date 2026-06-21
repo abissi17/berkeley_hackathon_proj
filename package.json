@@ -1,0 +1,25 @@
+{
+  "name": "berkeley_hackathon_proj",
+  "version": "1.0.0",
+  "description": "AI-powered care navigation for families of children with developmental concerns. Built for the UC Berkeley AI Hackathon (June 20–21, 2026).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abissi17/berkeley_hackathon_proj.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/abissi17/berkeley_hackathon_proj/issues"
+  },
+  "homepage": "https://github.com/abissi17/berkeley_hackathon_proj#readme",
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.6.0",
+    "zod": "^4.4.3"
+  }
+}

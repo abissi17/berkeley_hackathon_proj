@@ -10,9 +10,10 @@ export default function ProvidersTab({ providers }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-gray-900">Local therapy providers</h2>
+      <h2 className="text-lg font-bold text-gray-900">Nearby autism & mental health providers</h2>
       <p className="text-sm text-gray-500">
-        Providers near your zip code. Results are cached for 24 hours.
+        Autism specialists, behavioral therapists, and developmental health providers near your zip code.
+        Results are scraped live and cached for 24 hours.
         Always call ahead to confirm availability and insurance acceptance.
       </p>
 
