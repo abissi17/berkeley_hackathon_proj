@@ -61,7 +61,9 @@ def scrape_providers(zip_code: str) -> list[dict]:
     If Browserbase keys are present, runs the Stagehand scraper and returns
     live results.  Otherwise returns plausible mock data.
     """
-    if BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID:
+    api_key = os.getenv("BROWSERBASE_API_KEY", "")
+    project_id = os.getenv("BROWSERBASE_PROJECT_ID", "")
+    if api_key and project_id:
         try:
             return _call_browserbase(zip_code)
         except Exception as exc:
@@ -109,8 +111,8 @@ def _call_browserbase(zip_code: str) -> list[dict]:
     """
     env = {
         **os.environ,
-        "BROWSERBASE_API_KEY": BROWSERBASE_API_KEY,
-        "BROWSERBASE_PROJECT_ID": BROWSERBASE_PROJECT_ID,
+        "BROWSERBASE_API_KEY": os.getenv("BROWSERBASE_API_KEY", ""),
+        "BROWSERBASE_PROJECT_ID": os.getenv("BROWSERBASE_PROJECT_ID", ""),
     }
 
     result = subprocess.run(

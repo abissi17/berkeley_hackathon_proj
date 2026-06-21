@@ -135,8 +135,11 @@ async function scrapeGoogleMaps(page) {
       );
       if (!nameEl) return;
       const name = (nameEl.innerText || nameEl.getAttribute("aria-label") || "").trim();
-      // Skip garbage entries (junk blobs, too long, contains newlines)
-      if (!name || name.length < 3 || name.length > 120 || name.includes("\n")) return;
+      // Skip garbage entries: too short/long, newlines, all-lowercase UI strings, known Maps chrome
+      const UI_JUNK = new Set(["stars", "close", "open", "closed", "directions", "save", "share", "website", "call"]);
+      if (!name || name.length < 4 || name.length > 120 || name.includes("\n")) return;
+      if (UI_JUNK.has(name.toLowerCase())) return;
+      if (/^[a-z\s·]+$/.test(name)) return; // all-lowercase = UI element, not a business name
 
       // Category label (often 2nd line under name)
       const spans = item.querySelectorAll(".W4Efsd span, .Io6YTe");
