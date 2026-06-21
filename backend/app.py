@@ -20,6 +20,7 @@ from flask_cors import CORS
 # Load .env before importing services that read os.getenv
 load_dotenv(verbose=False)  # searches cwd and parent dirs, finds project-root .env
 
+from models import db
 from services.claude_service import generate_roadmap_and_letters, get_chat_reply
 from services.browserbase_service import scrape_providers, FALLBACK_PROVIDERS
 from services.redis_service import (
@@ -28,7 +29,12 @@ from services.redis_service import (
     get_chat_history,
     append_chat_message,
 )
-from models.database import init_db, save_child, get_all_children, get_child
+from legacy_db.database import init_db, save_child, get_all_children, get_child
+from routes.clinic import clinic_bp
+from routes.children import children_bp
+from routes.roadmap import roadmap_bp
+from routes.letters import letters_bp
+from routes.chat import chat_bp
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -37,17 +43,41 @@ from models.database import init_db, save_child, get_all_children, get_child
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.secret_key = "compass-dev-secret-key-change-in-production"
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", "compass-dev-secret-key-change-in-production")
+
+    # SQLAlchemy
+    db_url = os.getenv("DATABASE_URL", "")
+    # SQLAlchemy requires postgresql:// not postgres://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(app)
 
     # Allow frontend dev server on :3000
     CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
-    # --- startup: init PostgreSQL table (best-effort) ---
+    # Register blueprints
+    app.register_blueprint(clinic_bp, url_prefix="/api/clinic")
+    app.register_blueprint(children_bp, url_prefix="/api/children")
+    app.register_blueprint(roadmap_bp, url_prefix="/api/roadmap")
+    app.register_blueprint(letters_bp, url_prefix="/api/letters")
+    app.register_blueprint(chat_bp, url_prefix="/api/chat/clinic")
+
+    # Create SQLAlchemy tables
+    with app.app_context():
+        try:
+            db.create_all()
+            print("[db] SQLAlchemy tables created (or already exist).")
+        except Exception as exc:
+            print(f"[db] SQLAlchemy setup failed ({exc}) — clinic persistence disabled.")
+
+    # --- startup: init legacy psycopg table (best-effort) ---
     try:
         init_db()
-        print("[db] PostgreSQL table initialized (or already exists).")
+        print("[db] Legacy PostgreSQL table initialized (or already exists).")
     except Exception as exc:
-        print(f"[db] PostgreSQL not available ({exc}) — clinic persistence disabled.")
+        print(f"[db] Legacy PostgreSQL not available ({exc}).")
 
     return app
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { submitIntake } from "../api/compassApi";
 
 const DIAGNOSIS_OPTIONS = [
@@ -10,6 +10,8 @@ const DIAGNOSIS_OPTIONS = [
 
 export default function IntakePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const clinicMode = searchParams.get("mode") === "clinic";
 
   const [form, setForm] = useState({
     child_name: "",
@@ -42,10 +44,13 @@ export default function IntakePage() {
     setLoading(true);
 
     try {
-      const result = await submitIntake(form);
-      // Store results in sessionStorage so the dashboard can read them
-      sessionStorage.setItem("compass_dashboard", JSON.stringify(result));
-      navigate("/dashboard");
+      const result = await submitIntake({ ...form, save_to_db: clinicMode });
+      if (clinicMode) {
+        navigate("/clinic");
+      } else {
+        sessionStorage.setItem("compass_dashboard", JSON.stringify(result));
+        navigate("/dashboard");
+      }
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -69,11 +74,12 @@ export default function IntakePage() {
         <div className="text-center mb-8">
           <span className="text-4xl">🧭</span>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
-            Tell us about your child
+            {clinicMode ? "Add a child to your clinic" : "Tell us about your child"}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            This takes about 5 minutes. All information stays private in
-            your browser session.
+            {clinicMode
+              ? "This child's roadmap and letters will be saved to your clinic database."
+              : "This takes about 5 minutes. All information stays private in your browser session."}
           </p>
         </div>
 

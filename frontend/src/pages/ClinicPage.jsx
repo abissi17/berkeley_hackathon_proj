@@ -68,7 +68,7 @@ export default function ClinicPage() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/intake" className="btn-primary text-sm !py-2 !px-4">
+            <Link to="/intake?mode=clinic" className="btn-primary text-sm !py-2 !px-4">
               + Add new child
             </Link>
             <button
