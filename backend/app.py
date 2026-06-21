@@ -9,6 +9,7 @@ Run:
     flask run --port 5000
 """
 
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -17,7 +18,7 @@ from flask import Flask, request, session, jsonify
 from flask_cors import CORS
 
 # Load .env before importing services that read os.getenv
-load_dotenv(dotenv_path=".env", verbose=False)
+load_dotenv(verbose=False)  # searches cwd and parent dirs, finds project-root .env
 
 from services.claude_service import generate_roadmap_and_letters, get_chat_reply
 from services.browserbase_service import scrape_providers, FALLBACK_PROVIDERS
@@ -216,6 +217,6 @@ def health():
 # Main
 # ===================================================================
 if __name__ == "__main__":
-    port = int("5000")
+    port = int(os.getenv("FLASK_PORT", "5001"))
     print(f"\n  Compass backend running at http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=True)
