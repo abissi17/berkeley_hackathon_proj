@@ -36,14 +36,14 @@ export default function LandingPage() {
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
           <button
             onClick={() => navigate('/intake')}
-            className="flex-1 bg-compass-600 hover:bg-compass-700 active:bg-compass-800 text-white font-semibold py-4 px-8 rounded-2xl text-lg shadow-lg shadow-compass-200 transition-all duration-150 flex flex-col items-center gap-1"
+            className="flex-1 bg-compass-600 hover:bg-compass-700 active:bg-compass-800 text-white font-semibold py-4 px-8 rounded-2xl text-lg shadow-lg shadow-compass-200 transition-all duration-300 ease-in-out hover:-translate-y-1 flex flex-col items-center gap-1"
           >
             <span>I'm a Parent</span>
             <span className="text-xs font-normal text-compass-200">Get my child's roadmap →</span>
           </button>
           <button
             onClick={() => navigate('/clinic')}
-            className="flex-1 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-800 font-semibold py-4 px-8 rounded-2xl text-lg border-2 border-gray-200 transition-all duration-150 flex flex-col items-center gap-1"
+            className="flex-1 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-800 font-semibold py-4 px-8 rounded-2xl text-lg border-2 border-gray-200 transition-all duration-300 ease-in-out hover:-translate-y-1 flex flex-col items-center gap-1"
           >
             <span>I'm a Clinic</span>
             <span className="text-xs font-normal text-gray-400">Case management dashboard →</span>

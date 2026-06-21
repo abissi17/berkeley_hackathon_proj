@@ -93,10 +93,11 @@ export default function IntakePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Child's age:{" "}
               <span className="text-compass-600 font-semibold">
-                {form.child_age_months} months
-                {form.child_age_months >= 12
-                  ? ` (${Math.floor(form.child_age_months / 12)}y ${form.child_age_months % 12}m)`
-                  : ""}
+                {form.child_age_months < 12
+                  ? `${form.child_age_months}m`
+                  : form.child_age_months % 12 === 0
+                  ? `${form.child_age_months / 12}y`
+                  : `${Math.floor(form.child_age_months / 12)}y ${form.child_age_months % 12}m`}
               </span>
             </label>
             <input
@@ -111,6 +112,11 @@ export default function IntakePage() {
             />
             <div className="flex justify-between text-xs text-gray-400">
               <span>0m</span>
+              <span>6m</span>
+              <span>1y</span>
+              <span>3y</span>
+              <span>6y</span>
+              <span>12y</span>
               <span>18y</span>
             </div>
           </div>
