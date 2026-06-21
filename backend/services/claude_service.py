@@ -7,7 +7,7 @@ import os
 import json
 import anthropic
 
-from prompts.roadmap_prompt import ROADMAP_SYSTEM_PROMPT
+from prompts.roadmap_prompt import ROADMAP_SYSTEM_PROMPT, LETTERS_SYSTEM_PROMPT
 from prompts.letter_prompt import CHAT_SYSTEM_PROMPT
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -179,7 +179,6 @@ MOCK_LETTERS = {
 
 
 def _inject_child_context(template: str, child: dict) -> str:
-    """Replace placeholders in a letter with child context where possible."""
     replacements = {
         "[CHILD NAME]": child.get("child_name", "[CHILD NAME]"),
         "[AGE]": str(child.get("child_age_months", "[AGE]")),
@@ -191,11 +190,12 @@ def _inject_child_context(template: str, child: dict) -> str:
     return template
 
 
-def _mock_result(intake_data: dict) -> dict:
-    return {
-        "roadmap": MOCK_ROADMAP,
-        "letters": {k: _inject_child_context(v, intake_data) for k, v in MOCK_LETTERS.items()},
-    }
+def _mock_roadmap() -> list:
+    return MOCK_ROADMAP
+
+
+def _mock_letters(intake_data: dict) -> dict:
+    return {k: _inject_child_context(v, intake_data) for k, v in MOCK_LETTERS.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -203,26 +203,44 @@ def _mock_result(intake_data: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def generate_roadmap_and_letters(intake_data: dict) -> dict:
-    """
-    Generate a personalized roadmap and three draft letters.
-    Calls Claude when an API key is present; falls back to mock data otherwise.
-    """
+def generate_roadmap(intake_data: dict) -> list:
+    """Generate a personalized roadmap. Falls back to mock data on failure."""
     if ANTHROPIC_API_KEY:
         return _call_claude_for_roadmap(intake_data)
-    return _mock_result(intake_data)
+    return _mock_roadmap()
+
+
+def generate_letters(intake_data: dict) -> dict:
+    """Generate three draft letters on demand. Falls back to mock data on failure."""
+    if ANTHROPIC_API_KEY:
+        return _call_claude_for_letters(intake_data)
+    return _mock_letters(intake_data)
+
+
+def get_chat_reply(intake_data: dict, history: list[dict], message: str) -> str:
+    """Return a context-aware chat reply using Claude."""
+    if ANTHROPIC_API_KEY:
+        return _call_claude_for_chat(intake_data, history, message)
+    return (
+        f"Thank you for your question about {intake_data.get('child_name', 'your child')}. "
+        "Please complete the intake form to enable the AI assistant."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
 def _fill_prompt(template: str, vars: dict) -> str:
-    """Replace {key} placeholders without tripping on literal { } in JSON examples."""
     result = template
     for key, value in vars.items():
         result = result.replace(f"{{{key}}}", str(value))
     return result
 
 
-def _call_claude_for_roadmap(intake_data: dict) -> dict:
-    prompt_vars = {
+def _prompt_vars(intake_data: dict) -> dict:
+    return {
         "child_name": intake_data.get("child_name", "your child"),
         "child_age_months": intake_data.get("child_age_months", "unknown"),
         "zip_code": intake_data.get("zip_code", "not provided"),
@@ -231,58 +249,53 @@ def _call_claude_for_roadmap(intake_data: dict) -> dict:
         "insurance": intake_data.get("insurance") or "not provided",
     }
 
+
+def _strip_fences(text: str) -> str:
+    if text.startswith("```"):
+        text = text.split("```", 2)[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.rsplit("```", 1)[0].strip()
+    return text
+
+
+def _call_claude_for_roadmap(intake_data: dict) -> list:
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=_fill_prompt(ROADMAP_SYSTEM_PROMPT, _prompt_vars(intake_data)),
+            messages=[{"role": "user", "content": "Generate the roadmap now."}],
+        )
+        return json.loads(_strip_fences(response.content[0].text.strip()))
+    except Exception as exc:
+        print(f"[claude] Roadmap generation failed: {exc}")
+        return _mock_roadmap()
+
+
+def _call_claude_for_letters(intake_data: dict) -> dict:
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
-            system=_fill_prompt(ROADMAP_SYSTEM_PROMPT, prompt_vars),
-            messages=[{"role": "user", "content": "Generate the roadmap and letters now."}],
+            max_tokens=2048,
+            system=_fill_prompt(LETTERS_SYSTEM_PROMPT, _prompt_vars(intake_data)),
+            messages=[{"role": "user", "content": "Generate the three letters now."}],
         )
-        text = response.content[0].text.strip()
-
-        # Strip markdown fences if Claude adds them despite instructions
-        if text.startswith("```"):
-            text = text.split("```", 2)[1]
-            if text.startswith("json"):
-                text = text[4:]
-            text = text.rsplit("```", 1)[0].strip()
-
-        return json.loads(text)
+        return json.loads(_strip_fences(response.content[0].text.strip()))
     except Exception as exc:
-        print(f"[claude] Roadmap generation failed: {exc}")
-        return _mock_result(intake_data)
-
-
-def get_chat_reply(intake_data: dict, history: list[dict], message: str) -> str:
-    """
-    Return a context-aware chat reply using Claude.
-    Falls back to a generic response on failure or missing API key.
-    """
-    if ANTHROPIC_API_KEY:
-        return _call_claude_for_chat(intake_data, history, message)
-
-    return (
-        f"Thank you for your question about {intake_data.get('child_name', 'your child')}. "
-        "Please complete the intake form to enable the AI assistant."
-    )
+        print(f"[claude] Letter generation failed: {exc}")
+        return _mock_letters(intake_data)
 
 
 def _call_claude_for_chat(intake_data: dict, history: list[dict], message: str) -> str:
-    prompt_vars = {
-        "child_name": intake_data.get("child_name", "your child"),
-        "child_age_months": intake_data.get("child_age_months", "unknown"),
-        "zip_code": intake_data.get("zip_code", "not provided"),
-        "concerns": intake_data.get("concerns", "general developmental concerns"),
-        "diagnosis_status": intake_data.get("diagnosis_status", "none"),
-    }
-
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
-            system=_fill_prompt(CHAT_SYSTEM_PROMPT, prompt_vars),
+            system=_fill_prompt(CHAT_SYSTEM_PROMPT, _prompt_vars(intake_data)),
             messages=history + [{"role": "user", "content": message}],
         )
         return response.content[0].text.strip()

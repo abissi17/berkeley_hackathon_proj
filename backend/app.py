@@ -21,7 +21,7 @@ from flask_cors import CORS
 load_dotenv(verbose=False)  # searches cwd and parent dirs, finds project-root .env
 
 from models import db
-from services.claude_service import generate_roadmap_and_letters, get_chat_reply
+from services.claude_service import generate_roadmap, get_chat_reply
 from services.browserbase_service import scrape_providers, FALLBACK_PROVIDERS
 from services.redis_service import (
     get_cached_providers,
@@ -29,7 +29,7 @@ from services.redis_service import (
     get_chat_history,
     append_chat_message,
 )
-from legacy_db.database import init_db, save_child, get_all_children, get_child
+from models.database import init_db, save_child, get_all_children, get_child
 from routes.clinic import clinic_bp
 from routes.children import children_bp
 from routes.roadmap import roadmap_bp
@@ -126,7 +126,7 @@ def intake():
 
     # --- run Claude and Browserbase in parallel ---
     with ThreadPoolExecutor(max_workers=2) as pool:
-        claude_future = pool.submit(generate_roadmap_and_letters, intake_data)
+        claude_future = pool.submit(generate_roadmap, intake_data)
 
         if cached:
             providers = cached
@@ -138,12 +138,11 @@ def intake():
             if zip_code and providers:
                 set_cached_providers(zip_code, providers)
 
-        roadmap_and_letters = claude_future.result()
+        roadmap = claude_future.result()
 
     # --- assemble response ---
     session_id = str(uuid.uuid4())
-    roadmap = roadmap_and_letters.get("roadmap", [])
-    letters = roadmap_and_letters.get("letters", {})
+    letters = {}
 
     response = {
         "session_id": session_id,

@@ -1,6 +1,6 @@
 import os
 import anthropic
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, session, jsonify
 from models import db, Child, Letter
 
 letters_bp = Blueprint("letters_bp", __name__)
@@ -28,6 +28,54 @@ LETTER_PROMPTS = {
         "List specific types of specialists to request."
     ),
 }
+
+
+@letters_bp.route("", methods=["POST"])
+def generate_session_letters():
+    """Generate all three letters for the current parent session."""
+    child = session.get("child")
+    if not child:
+        return jsonify({"error": "No active session. Please complete the intake form first."}), 400
+
+    name = child.get("child_name", "your child")
+    age = child.get("child_age_months", "unknown")
+    concerns = child.get("concerns", "developmental concerns")
+    insurance = child.get("insurance") or "not specified"
+
+    prompts = {
+        "school": (
+            f"Write a concise 3-paragraph letter (under 200 words) from a parent to a school district "
+            f"requesting an IEP evaluation for {name}, age {age} months. Concerns: {concerns}. "
+            f"Cite IDEA, 60-day evaluation timeline. Use [CAPS] placeholders for parent name, address, phone, district name. "
+            f"Say 'developmental concerns', never name a diagnosis."
+        ),
+        "insurance": (
+            f"Write a concise 3-paragraph letter (under 200 words) to an insurance company requesting "
+            f"coverage for developmental therapy for {name}, age {age} months. Insurer: {insurance}. Concerns: {concerns}. "
+            f"Mention EPSDT and medical necessity. Use [CAPS] placeholders for parent name, address, member ID. "
+            f"Say 'developmental concerns', never name a diagnosis."
+        ),
+        "regional_center": (
+            f"Write a concise 3-paragraph letter (under 200 words) to a California Regional Center "
+            f"requesting Early Start intake for {name}, age {age} months. Concerns: {concerns}. "
+            f"Cite IDEA Part C, Early Start, 45-day timeline. Use [CAPS] placeholders for parent name, address, phone, center name. "
+            f"Say 'developmental concerns', never name a diagnosis."
+        ),
+    }
+
+    try:
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        results = {}
+        for key, prompt in prompts.items():
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            results[key] = response.content[0].text
+        return jsonify({"letters": results})
+    except Exception as exc:
+        return jsonify({"error": f"Letter generation failed: {exc}"}), 500
 
 
 @letters_bp.route("/generate/<int:child_id>", methods=["POST"])

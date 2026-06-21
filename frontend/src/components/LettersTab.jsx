@@ -21,14 +21,32 @@ const LETTER_META = {
   },
 };
 
-export default function LettersTab({ letters }) {
+export default function LettersTab({ letters, onGenerate, loading }) {
   const [copiedKey, setCopiedKey] = useState(null);
 
   if (!letters || Object.keys(letters).length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">
-        <p className="text-4xl mb-2">✉️</p>
-        <p>No letters yet. Complete the intake form to generate draft letters.</p>
+      <div className="text-center py-16">
+        <p className="text-5xl mb-4">✉️</p>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Ready-to-send letters</h2>
+        <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+          Generate three personalized draft letters — to your school district, insurance company,
+          and regional center — pre-filled with the right legal language.
+        </p>
+        <button
+          onClick={onGenerate}
+          disabled={loading}
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition disabled:opacity-60"
+        >
+          {loading ? (
+            <>
+              <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              Generating…
+            </>
+          ) : (
+            "Generate Letters"
+          )}
+        </button>
       </div>
     );
   }

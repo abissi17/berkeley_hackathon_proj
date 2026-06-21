@@ -8,6 +8,24 @@
 const API_BASE = "/api";
 
 /**
+ * Generate letters on demand. Requires an active session (intake must have run first).
+ */
+export async function generateLetters() {
+  const res = await fetch(`${API_BASE}/letters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Letter generation failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+/**
  * Submit the intake form.  Returns the full response with roadmap,
  * letters, providers, and a session_id.
  */

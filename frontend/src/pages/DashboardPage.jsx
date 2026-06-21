@@ -4,6 +4,7 @@ import RoadmapTab from "../components/RoadmapTab";
 import LettersTab from "../components/LettersTab";
 import ProvidersTab from "../components/ProvidersTab";
 import ChatTab from "../components/ChatTab";
+import { generateLetters } from "../api/compassApi";
 
 const TABS = [
   { key: "roadmap", label: "🗺️ Roadmap" },
@@ -16,6 +17,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState("roadmap");
+  const [letters, setLetters] = useState(null);
+  const [lettersLoading, setLettersLoading] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("compass_dashboard");
@@ -24,7 +27,9 @@ export default function DashboardPage() {
       return;
     }
     try {
-      setData(JSON.parse(stored));
+      const parsed = JSON.parse(stored);
+      setData(parsed);
+      setLetters(parsed.letters || null);
     } catch {
       navigate("/intake");
     }
@@ -41,7 +46,19 @@ export default function DashboardPage() {
     );
   }
 
-  const { session_id, roadmap, letters, providers } = data;
+  const { session_id, roadmap, providers } = data;
+
+  async function handleGenerateLetters() {
+    setLettersLoading(true);
+    try {
+      const result = await generateLetters();
+      setLetters(result.letters);
+    } catch (err) {
+      console.error("Failed to generate letters:", err);
+    } finally {
+      setLettersLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -85,7 +102,13 @@ export default function DashboardPage() {
       {/* Tab content */}
       <main className="flex-1 max-w-5xl mx-auto px-4 py-8 w-full">
         {activeTab === "roadmap" && <RoadmapTab roadmap={roadmap} />}
-        {activeTab === "letters" && <LettersTab letters={letters} />}
+        {activeTab === "letters" && (
+          <LettersTab
+            letters={letters}
+            onGenerate={handleGenerateLetters}
+            loading={lettersLoading}
+          />
+        )}
         {activeTab === "providers" && <ProvidersTab providers={providers} />}
         {activeTab === "chat" && <ChatTab sessionId={session_id} />}
       </main>
