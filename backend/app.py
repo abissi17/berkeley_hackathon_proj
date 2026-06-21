@@ -18,7 +18,7 @@ from flask import Flask, request, session, jsonify
 from flask_cors import CORS
 
 # Load .env before importing services that read os.getenv
-load_dotenv(dotenv_path=".env", verbose=False)
+load_dotenv(verbose=False)  # searches cwd and parent dirs, finds project-root .env
 
 from services.claude_service import generate_roadmap_and_letters, get_chat_reply
 from services.browserbase_service import scrape_providers, FALLBACK_PROVIDERS
