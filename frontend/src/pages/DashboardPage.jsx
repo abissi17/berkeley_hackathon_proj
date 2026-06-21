@@ -53,7 +53,7 @@ export default function DashboardPage() {
             onClick={() => navigate("/")}
           >
             <span className="text-2xl">🧭</span>
-            <h1 className="text-xl font-bold text-gray-900">Compass</h1>
+            <h1 className="text-xl font-bold text-compass-700 tracking-tight">Compass</h1>
           </div>
           <button
             onClick={() => navigate(-1)}

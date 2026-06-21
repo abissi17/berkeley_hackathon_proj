@@ -36,21 +36,24 @@ function getP(priority) {
   return P[priority] || P.low;
 }
 
-// Deterministic pseudo-random Y offset per bubble index
-function seededOffset(i) {
-  const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-  return (v - Math.floor(v) - 0.5) * 120; // ±60 px
+// Easing: slight spring overshoot, approximates cubic-bezier(0.34, 1.56, 0.64, 1)
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
 export default function RoadmapTab({ roadmap }) {
   const [hovered, setHovered] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [mouse, setMouse] = useState({ x: -9999, y: -9999 });
-  const [spawned, setSpawned] = useState(false);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
+  // animY[i] = current Y center for bubble i (drives both bubble top and SVG paths)
+  const [animY, setAnimY] = useState([]);
 
   const wrapperRef = useRef(null);
+  const rafRef = useRef(null);
 
   const sorted = useMemo(
     () =>
@@ -60,9 +63,13 @@ export default function RoadmapTab({ roadmap }) {
     [roadmap]
   );
 
-  const yOffsets = useMemo(() => sorted.map((_, i) => seededOffset(i)), [sorted.length]);
+  // Random Y offsets — new on every mount / roadmap change
+  const yOffsets = useMemo(
+    () => sorted.map(() => (Math.random() - 0.5) * 120),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sorted.length]
+  );
 
-  // Measure container with ResizeObserver
   const measure = useCallback(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -77,14 +84,7 @@ export default function RoadmapTab({ roadmap }) {
     return () => ro.disconnect();
   }, [measure]);
 
-  // Reset + trigger spawn animation whenever roadmap changes
-  useEffect(() => {
-    setSpawned(false);
-    const t = setTimeout(() => setSpawned(true), 80);
-    return () => clearTimeout(t);
-  }, [sorted.length]);
-
-  // Compute bubble positions
+  // Bubble rest positions
   const positions = useMemo(() => {
     if (!containerW || !containerH || !sorted.length) return [];
     const n = sorted.length;
@@ -93,14 +93,44 @@ export default function RoadmapTab({ roadmap }) {
     return sorted.map((_, i) => ({
       x: n === 1 ? containerW / 2 : padX + (i * (containerW - 2 * padX)) / (n - 1),
       restY: cy + yOffsets[i],
+      startY: cy,
     }));
   }, [containerW, containerH, sorted.length, yOffsets]);
 
-  // SVG centers are always at rest positions
-  const centers = useMemo(
-    () => positions.map((p) => ({ x: p.x, y: p.restY })),
-    [positions]
-  );
+  // Drive the spawn animation with rAF — bubbles AND SVG centers move together
+  useEffect(() => {
+    if (!positions.length) return;
+
+    cancelAnimationFrame(rafRef.current);
+
+    // Snap everything to the center line immediately
+    setAnimY(positions.map((p) => p.startY));
+
+    const DURATION = 900;
+    const STAGGER = 65;
+    const INITIAL_DELAY = 80;
+    let startTime = null;
+
+    function tick(now) {
+      if (!startTime) startTime = now;
+      const elapsed = now - startTime - INITIAL_DELAY;
+
+      const next = positions.map((p, i) => {
+        const t = Math.min(1, Math.max(0, (elapsed - i * STAGGER) / DURATION));
+        return p.startY + easeOutBack(t) * (p.restY - p.startY);
+      });
+
+      setAnimY(next);
+
+      const totalMs = INITIAL_DELAY + (positions.length - 1) * STAGGER + DURATION;
+      if (elapsed < totalMs) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [positions]);
 
   const onMouseMove = useCallback((e) => {
     const wr = wrapperRef.current?.getBoundingClientRect();
@@ -129,6 +159,9 @@ export default function RoadmapTab({ roadmap }) {
     );
   }
 
+  // Live centers used by SVG — pulled from animY
+  const centers = positions.map((p, i) => ({ x: p.x, y: animY[i] ?? p.startY }));
+
   const expandedStep = expanded !== null ? sorted[expanded] : null;
 
   return (
@@ -141,7 +174,7 @@ export default function RoadmapTab({ roadmap }) {
         </p>
       </div>
 
-      {/* Canvas — flex-1 so it fills remaining height, overflow visible for tooltips */}
+      {/* Canvas */}
       <div
         ref={wrapperRef}
         onMouseMove={onMouseMove}
@@ -150,7 +183,7 @@ export default function RoadmapTab({ roadmap }) {
         style={{ overflow: "visible" }}
       >
         {/* SVG connecting lines */}
-        {containerW > 0 && (
+        {containerW > 0 && centers.length > 1 && (
           <svg
             className="absolute inset-0 pointer-events-none"
             style={{ width: "100%", height: "100%", overflow: "visible", borderRadius: "1rem" }}
@@ -179,7 +212,6 @@ export default function RoadmapTab({ roadmap }) {
               const d = buildPath(a, b);
               return (
                 <g key={i}>
-                  {/* Glow */}
                   <path
                     d={d}
                     fill="none"
@@ -189,7 +221,6 @@ export default function RoadmapTab({ roadmap }) {
                     opacity={near ? 0.22 : 0.08}
                     style={{ transition: "opacity 0.25s, stroke-width 0.25s" }}
                   />
-                  {/* Line */}
                   <path
                     d={d}
                     fill="none"
@@ -206,15 +237,14 @@ export default function RoadmapTab({ roadmap }) {
           </svg>
         )}
 
-        {/* Bubbles */}
+        {/* Bubbles — positioned using animY so they're always in sync with SVG */}
         {positions.map((pos, i) => {
           const step = sorted[i];
           const ps = getP(step.priority);
           const isHov = hovered === i;
           const icon = ICON[step.category] || "📌";
           const shortTitle = step.title.length > 22 ? step.title.slice(0, 20) + "…" : step.title;
-
-          // Tooltip flips below if bubble is in upper third of container
+          const currentY = animY[i] ?? pos.startY;
           const tooltipAbove = pos.restY > containerH * 0.35;
 
           return (
@@ -223,12 +253,7 @@ export default function RoadmapTab({ roadmap }) {
               style={{
                 position: "absolute",
                 left: pos.x - BUBBLE_R,
-                top: pos.restY - BUBBLE_R,
-                // Start offset from the center line, ease into rest position
-                transform: spawned ? "translateY(0px)" : `translateY(${-yOffsets[i]}px)`,
-                transition: spawned
-                  ? `transform 1s cubic-bezier(0.34, 1.56, 0.64, 1) ${i * 65}ms`
-                  : "none",
+                top: currentY - BUBBLE_R,
                 zIndex: isHov ? 20 : 1,
               }}
             >
@@ -271,13 +296,11 @@ export default function RoadmapTab({ roadmap }) {
                       : { top: BUBBLE_R * 2 + 14 }),
                   }}
                 >
-                  {/* Arrow */}
                   {tooltipAbove ? (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white rotate-45 border-b border-r border-gray-100" />
                   ) : (
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rotate-45 border-t border-l border-gray-100" />
                   )}
-
                   <div className="flex items-start gap-2 mb-2">
                     <span className="text-xl shrink-0">{icon}</span>
                     <span className="font-bold text-gray-900 text-sm leading-snug">{step.title}</span>
@@ -328,7 +351,6 @@ export default function RoadmapTab({ roadmap }) {
             style={{ maxHeight: "85vh", boxShadow: "0 40px 120px rgba(0,0,0,0.3)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Gradient header */}
             <div className={`bg-gradient-to-br ${getP(expandedStep.priority).headerBg} px-8 pt-8 pb-6`}>
               <button
                 onClick={() => setExpanded(null)}
@@ -353,12 +375,10 @@ export default function RoadmapTab({ roadmap }) {
               </div>
             </div>
 
-            {/* Body */}
             <div className="px-8 py-6 overflow-y-auto" style={{ maxHeight: "calc(85vh - 200px)" }}>
               <p className="text-gray-700 text-base leading-relaxed">{expandedStep.description}</p>
             </div>
 
-            {/* Footer nav */}
             <div className="px-8 pb-6 pt-2 flex items-center justify-between border-t border-gray-100">
               <button
                 disabled={expanded === 0}
